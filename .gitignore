@@ -1,1 +1,3 @@
-k8s-resources.iml
+.DS_Store
+/.idea/
+/istio-on-aks/
