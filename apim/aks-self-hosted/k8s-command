@@ -1,0 +1,3 @@
+kubectl create secret generic aks-nonprod-js-cluster-token --from-literal=value="GatewayKey aks-nonprod-js-cluster&202310141434&WC3FQ1v+1Py2wqGpKKyVEqF3GlfqWialqpCO0aKFkif2aDmNeFo/sRwOrmXpOFLONZ2TYk2EMu6543YSYORMsg=="  --type=Opaque
+
+kubectl apply -f aks-nonprod-js-cluster.yaml

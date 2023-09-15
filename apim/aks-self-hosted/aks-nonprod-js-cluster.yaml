@@ -1,0 +1,115 @@
+# NOTE: Before deploying to a production environment, please review the documentation -> https://aka.ms/self-hosted-gateway-production
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aks-nonprod-js-cluster-env
+  labels:
+    app: aks-nonprod-js-cluster
+data:
+  config.service.endpoint: "demo-dev-01.configuration.azure-api.net"
+  neighborhood.host: "aks-nonprod-js-cluster-instance-discovery"
+  runtime.deployment.artifact.source: "Azure Portal"
+  runtime.deployment.mechanism: "YAML"
+  runtime.deployment.orchestrator.type: "Kubernetes"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-nonprod-js-cluster
+  labels:
+    app: aks-nonprod-js-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aks-nonprod-js-cluster
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        app: aks-nonprod-js-cluster
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: aks-nonprod-js-cluster
+        image: mcr.microsoft.com/azure-api-management/gateway:v2
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: https
+          containerPort: 8081
+          # Container port used for rate limiting to discover instances
+        - name: rate-limit-dc
+          protocol: UDP
+          containerPort: 4290
+          # Container port used for instances to send heartbeats to each other
+        - name: dc-heartbeat
+          protocol: UDP
+          containerPort: 4291
+        readinessProbe:
+          httpGet:
+            path: /status-0123456789abcdef
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        env:
+        - name: config.service.auth
+          valueFrom:
+            secretKeyRef:
+              name: aks-nonprod-js-cluster-token
+              key: value
+        envFrom:
+        - configMapRef:
+            name: aks-nonprod-js-cluster-env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aks-nonprod-js-cluster-live-traffic
+  labels:
+    app: aks-nonprod-js-cluster
+spec:
+  type: LoadBalancer
+  # Defines how traffic is distributed to pods where it tries to send traffic originating from an IP to the same node, if possible
+  # Default value of clusterIP would load balance traffic
+  externalTrafficPolicy: Local
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: https
+    port: 443
+    targetPort: 8081
+  selector:
+    app: aks-nonprod-js-cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aks-nonprod-js-cluster-instance-discovery
+  labels:
+    app: aks-nonprod-js-cluster
+  annotations:
+    azure.apim.kubernetes.io/notes: "Headless service being used for instance discovery of self-hosted gateway"
+spec:
+  clusterIP: None
+  type: ClusterIP
+  ports:
+  - name: rate-limit-discovery
+    port: 4290
+    targetPort: rate-limit-dc
+    protocol: UDP
+  - name: discovery-heartbeat
+    port: 4291
+    targetPort: dc-heartbeat
+    protocol: UDP
+  selector:
+    app: aks-nonprod-js-cluster

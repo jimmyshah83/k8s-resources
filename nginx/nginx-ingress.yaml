@@ -1,0 +1,8 @@
+controller:
+  service:
+    annotations:
+#      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+      traffic.sidecar.istio.io/includeInboundPorts: ""
+      traffic.sidecar.istio.io/excludeInboundPorts: "80,443"
+      traffic.sidecar.istio.io/excludeOutboundIPRanges: "10.90.0.0/16,10.45.0.0/16"
+      sidecar.istio.io/inject: 'true'
